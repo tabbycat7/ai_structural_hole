@@ -1,0 +1,14 @@
+# Secrets
+.env
+
+# Caches / outputs
+.cache/
+outputs/
+**/__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+.history/
+.ipynb_checkpoints/
+.pytest_cache/
