@@ -1,5 +1,47 @@
-"""LLM access layer (OpenRouter, OpenAI-compatible) with caching and a mock."""
+"""LLM access layer with multi-provider routing, caching, and a mock."""
 
-from .client import LLMResponse, OpenRouterClient, MockClient, get_client
+from .client import (
+    LLMResponse,
+    DeepSeekClient,
+    DoubaoClient,
+    KimiClient,
+    MinimaxClient,
+    MockClient,
+    OpenRouterClient,
+    QwenClient,
+    RoutingClient,
+    get_client,
+    is_deepseek_model,
+    is_doubao_model,
+    is_kimi_model,
+    is_minimax_model,
+    is_qwen_model,
+    resolve_deepseek_model,
+    resolve_doubao_model,
+    resolve_kimi_model,
+    resolve_minimax_model,
+    resolve_qwen_model,
+)
 
-__all__ = ["LLMResponse", "OpenRouterClient", "MockClient", "get_client"]
+__all__ = [
+    "LLMResponse",
+    "DeepSeekClient",
+    "DoubaoClient",
+    "KimiClient",
+    "MinimaxClient",
+    "MockClient",
+    "OpenRouterClient",
+    "QwenClient",
+    "RoutingClient",
+    "get_client",
+    "is_deepseek_model",
+    "is_doubao_model",
+    "is_kimi_model",
+    "is_minimax_model",
+    "is_qwen_model",
+    "resolve_deepseek_model",
+    "resolve_doubao_model",
+    "resolve_kimi_model",
+    "resolve_minimax_model",
+    "resolve_qwen_model",
+]

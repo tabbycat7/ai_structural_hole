@@ -6,9 +6,29 @@
 outputs/
 **/__pycache__/
 *.pyc
+.pytest_cache/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
 
 # OS / editor
 .DS_Store
 .history/
 .ipynb_checkpoints/
-.pytest_cache/
+
+# Large raw datasets (DuReader upstream; download separately)
+search.dev.json
+preprocessed/trainset/
+preprocessed/devset/
+preprocessed/testset/
+
+# Generated experiment data (regenerate via CLI; see data/README.md)
+data/base_articles/
+data/variant_articles/
+data/query_pool/
+data/rag_corpus/
+
+# Large binary caches
+*.npy

@@ -35,10 +35,14 @@ python -m ai_structural_holes.cli study4 --mock
 接入真实模型(经 OpenRouter):
 
 ```bash
-python -m ai_structural_holes.cli study1 --models openai/gpt-4o,deepseek/deepseek-chat --seeds 3
+# 1) 冻结基线文章  2) 复用+重生成并冻结全部变体(可抽检)  3) 跑实验(变体全命中缓存)
+python -m ai_structural_holes.cli gen-base --model deepseek/deepseek-chat --per-domain 50
+python -m ai_structural_holes.cli gen-variants --model deepseek/deepseek-chat --per-domain 50
+python -m ai_structural_holes.cli study1 --models openai/gpt-4o,deepseek/deepseek-chat --seeds 3 --gen-route llm
 ```
 
-输出(CSV + 图)写入 `outputs/<study>/`。
+输出(CSV + 图)写入 `outputs/<study>/`。`gen-variants` 会导出
+`outputs/study1/variants_manifest.csv` 供人工抽检字数/正文。
 
 ## 因果路线(计划第 2、7 节)
 
@@ -88,4 +92,8 @@ python -m pytest -q
   全链路(解析→ATE→后门→EI)。真实结论必须经 OpenRouter 调真实模型获得。
 - 因 `S→O` 依赖,O 维度优先走 SCM 后门路线;OFAT 中 O4 只在 S1 存在时操纵。中介/交互分析
   (`mediation_proportion`)应在 Study 2 的析因数据上运行(S1、O4 联合变化)。
+- LLM 变体生成**不再做硬编码格式质检**,改写档位要求仅作写作指引;分析按指定设计档位建列。
+- Study 1 分析:解析失败(parse_ok=0)视为缺失剔除(非 Y=0);每个因子的 EI 限定在其自身
+  OFAT 配对(`scope_col="target_dim"`);配对内共享同一竞争环境;ATE 置信区间按 query 聚类
+  自助(避免伪重复)。
 - 不在代码中硬编码密钥;`call_model` 内置重试/限速退避与按请求哈希的磁盘缓存(去重省钱、可复现)。

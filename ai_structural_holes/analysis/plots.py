@@ -15,11 +15,30 @@ def ei_leverage_bar(ei_table: pd.DataFrame, out_path: Path, title: str = "EI lev
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tab = ei_table.sort_values("EI_norm", ascending=True)
+
+    if ei_table.empty or "EI_share" not in ei_table.columns:
+        fig, ax = plt.subplots(figsize=(7, 2))
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.5,
+            "No EI estimates\n(insufficient outcome variation or parse failures)",
+            ha="center",
+            va="center",
+            fontsize=11,
+            transform=ax.transAxes,
+        )
+        ax.set_title(title)
+        fig.tight_layout()
+        fig.savefig(out_path, dpi=150)
+        plt.close(fig)
+        return out_path
+
+    tab = ei_table.sort_values("EI_share", ascending=True)
 
     fig, ax = plt.subplots(figsize=(7, max(3, 0.45 * len(tab))))
-    ax.barh(tab["factor"], tab["EI_norm"])
-    ax.set_xlabel("normalized EI (bits, 0-1)")
+    ax.barh(tab["factor"], tab["EI_share"])
+    ax.set_xlabel("EI share (normalized, sums to 1)")
     ax.set_ylabel("feature")
     ax.set_title(title)
     fig.tight_layout()
@@ -36,7 +55,25 @@ def ate_forest(ate_table: pd.DataFrame, out_path: Path, title: str = "ATE by fea
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tab = ate_table.dropna(subset=["ATE"]).copy()
+    tab = ate_table.dropna(subset=["ATE"]).copy() if "ATE" in ate_table.columns else ate_table.copy()
+
+    if tab.empty:
+        fig, ax = plt.subplots(figsize=(7, 2))
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.5,
+            "No ATE estimates\n(insufficient paired outcomes)",
+            ha="center",
+            va="center",
+            fontsize=11,
+            transform=ax.transAxes,
+        )
+        ax.set_title(title)
+        fig.tight_layout()
+        fig.savefig(out_path, dpi=150)
+        plt.close(fig)
+        return out_path
 
     fig, ax = plt.subplots(figsize=(7, max(3, 0.45 * len(tab))))
     y = range(len(tab))

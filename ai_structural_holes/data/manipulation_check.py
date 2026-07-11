@@ -52,7 +52,7 @@ def detect_profile(text: str) -> FeatureProfile:
     # O4: 0 distant / 1 adjacent / 2 bound (structural markers, orthogonal to S1)
     if "(证据:" in text or "（证据:" in text:
         prof["O4"] = 2
-    elif "紧邻依据" in text:
+    elif "紧邻" in text:
         prof["O4"] = 1
     else:
         prof["O4"] = 0

@@ -17,7 +17,8 @@ from ..task.prompts import build_messages
 
 # Rough heuristics (transparent, adjustable).
 TOKENS_PER_CHAR = 0.7          # mixed Chinese + markup
-DEFAULT_OUTPUT_TOKENS = 150    # the JSON decision is short
+DEFAULT_OUTPUT_TOKENS_MINIMAL = 16
+DEFAULT_OUTPUT_TOKENS_FULL = 150
 DEFAULT_PRICE_IN = 2.0         # USD per 1M input tokens (blended guess)
 DEFAULT_PRICE_OUT = 6.0        # USD per 1M output tokens (blended guess)
 
@@ -65,6 +66,7 @@ def compute_plan(
     price_out: float = DEFAULT_PRICE_OUT,
     sample: int = 24,
     seed: int = 0,
+    output_mode: str = "minimal",
 ) -> CallPlan:
     n_calls = len(candidate_sets) * n_models * n_prompt_styles * n_seeds
 
@@ -79,13 +81,16 @@ def compute_plan(
         if q is None:
             continue
         texts = [articles_by_id[cid].text for cid in cs.ordered_ids]
-        msgs, _ = build_messages(q.text, texts, "neutral", q.domain)
+        msgs, _ = build_messages(q.text, texts, "neutral", q.domain, output_mode=output_mode)
         char_counts.append(sum(len(m["content"]) for m in msgs))
     avg_chars = (sum(char_counts) / len(char_counts)) if char_counts else 0.0
     avg_input_tokens = int(avg_chars * TOKENS_PER_CHAR)
 
+    out_per_call = (
+        DEFAULT_OUTPUT_TOKENS_MINIMAL if output_mode == "minimal" else DEFAULT_OUTPUT_TOKENS_FULL
+    )
     est_in = avg_input_tokens * n_calls
-    est_out = DEFAULT_OUTPUT_TOKENS * n_calls
+    est_out = out_per_call * n_calls
     cost = est_in / 1e6 * price_in + est_out / 1e6 * price_out
 
     n_queries = len(queries_by_id)

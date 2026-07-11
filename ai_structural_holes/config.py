@@ -33,6 +33,11 @@ class Paths:
     cache_dir: Path = field(default_factory=lambda: _path_from_env("ASH_CACHE_DIR", ".cache/llm"))
     output_dir: Path = field(default_factory=lambda: _path_from_env("ASH_OUTPUT_DIR", "outputs"))
     data_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "data")
+    # Frozen real-passage corpus + cached dense embeddings for Study 5 (RAG).
+    rag_corpus_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "data" / "rag_corpus")
+    rag_embed_cache_dir: Path = field(
+        default_factory=lambda: _path_from_env("ASH_RAG_EMBED_DIR", ".cache/rag_embeddings")
+    )
 
     def ensure(self) -> "Paths":
         for p in (self.cache_dir, self.output_dir, self.data_dir):
@@ -43,7 +48,8 @@ class Paths:
 PATHS = Paths()
 
 
-# Default model roster (all routed through OpenRouter). Override per-run as needed.
+# Default model roster. Non-DeepSeek models use OpenRouter; DeepSeek uses the
+# official API (https://api.deepseek.com). Override per-run as needed.
 DEFAULT_MODELS = [
     "openai/gpt-4o",
     "anthropic/claude-3.5-sonnet",
@@ -61,3 +67,21 @@ PROMPT_STYLES = ["neutral", "cite_source", "critical_eval", "persona"]
 
 # Competition environment R: candidate-set sizes to test.
 CANDIDATE_SET_SIZES = [3, 5, 8]
+
+# --------------------------------------------------------------------------- #
+# Study 5 (real RAG retrieval loop) defaults
+# --------------------------------------------------------------------------- #
+# How many documents the retriever returns (the top-k context handed to the
+# selection model in the generation stage).
+RAG_TOP_K = 8
+# Hybrid fusion weight: score = alpha * dense_cosine + (1 - alpha) * bm25_norm.
+RAG_HYBRID_ALPHA = 0.5
+# Retriever mode: "hybrid" (BM25 + dense), "bm25" (lexical only), "dense" only.
+RAG_RETRIEVER = "hybrid"
+# Chinese sentence-embedding model used for the dense channel.
+RAG_EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
+
+
+def llm_cache_enabled() -> bool:
+    """True when LLM response disk cache is explicitly enabled (default off for studies)."""
+    return os.environ.get("ASH_LLM_CACHE", "").strip().lower() in ("1", "true", "yes")

@@ -52,30 +52,65 @@ def _bootstrap_ci(values: np.ndarray, n_boot: int = 2000, alpha: float = 0.05,
     return (float(np.quantile(boots, alpha / 2)), float(np.quantile(boots, 1 - alpha / 2)))
 
 
+def _cluster_bootstrap_ci(values: np.ndarray, clusters: np.ndarray,
+                          n_boot: int = 2000, alpha: float = 0.05,
+                          rng: Optional[np.random.Generator] = None) -> tuple:
+    """Cluster (block) bootstrap: resample whole clusters with replacement.
+
+    The per-pair differences within one query are highly correlated, so treating
+    them as independent underestimates the CI (pseudo-replication). Here we
+    resample the clusters (queries) themselves and pool all differences of each
+    drawn cluster, which propagates between-cluster variance correctly.
+    """
+    rng = rng or np.random.default_rng(0)
+    if len(values) == 0:
+        return (float("nan"), float("nan"))
+    uniq = np.unique(clusters)
+    # Pre-group the differences by cluster to avoid repeated masking.
+    by_cluster = {c: values[clusters == c] for c in uniq}
+    boots = []
+    for _ in range(n_boot):
+        drawn = rng.choice(uniq, size=len(uniq), replace=True)
+        pooled = np.concatenate([by_cluster[c] for c in drawn])
+        boots.append(pooled.mean())
+    boots = np.array(boots)
+    return (float(np.quantile(boots, alpha / 2)), float(np.quantile(boots, 1 - alpha / 2)))
+
+
 def paired_ate(
     df: pd.DataFrame,
     factor: str,
     pair_key: str,
     outcome: str = "y",
     n_boot: int = 2000,
+    cluster: Optional[str] = None,
 ) -> ATE:
     """Paired ATE: within each `pair_key`, treated level vs control level of factor.
 
     Assumes two levels present for the factor (baseline vs top). Differences are
-    computed per pair then averaged (paired bootstrap CI).
+    computed per pair then averaged. The CI is a paired bootstrap over pairs, or,
+    when `cluster` is given (e.g. "query_id"), a cluster bootstrap that resamples
+    whole clusters to avoid pseudo-replication.
     """
     dim = get_dimension(factor)
     lo, hi = dim.baseline_code(), dim.top_code()
     sub = df[df[factor].isin([lo, hi])]
     diffs = []
+    clusters = []
+    have_cluster = bool(cluster) and cluster in sub.columns
     for _, g in sub.groupby(pair_key):
         t = g[g[factor] == hi][outcome]
         c = g[g[factor] == lo][outcome]
         if len(t) and len(c):
             diffs.append(t.mean() - c.mean())
+            if have_cluster:
+                clusters.append(g[cluster].iloc[0])
     diffs = np.array(diffs, dtype=float)
     ate = float(diffs.mean()) if len(diffs) else float("nan")
-    ci = _bootstrap_ci(diffs, n_boot=n_boot)
+    if have_cluster and len(diffs):
+        ci = _cluster_bootstrap_ci(diffs, np.array(clusters), n_boot=n_boot)
+    else:
+        ci = _bootstrap_ci(diffs, n_boot=n_boot)
     n_t = int((sub[factor] == hi).sum())
     n_c = int((sub[factor] == lo).sum())
     return ATE(factor, ate, ci[0], ci[1], n_t, n_c, hi, lo)
@@ -108,15 +143,20 @@ def ate_table(
     factors: Optional[Sequence[str]] = None,
     outcome: str = "y",
     paired_key: Optional[str] = None,
+    cluster: Optional[str] = None,
 ) -> pd.DataFrame:
-    """ATE for each factor. Uses paired_ate if `paired_key` given, else marginal."""
+    """ATE for each factor. Uses paired_ate if `paired_key` given, else marginal.
+
+    `cluster` (e.g. "query_id") is forwarded to `paired_ate` for a cluster
+    bootstrap CI.
+    """
     factors = list(factors or all_ids())
     rows = []
     for f in factors:
         if f not in df.columns:
             continue
         if paired_key and paired_key in df.columns:
-            res = paired_ate(df, f, paired_key, outcome)
+            res = paired_ate(df, f, paired_key, outcome, cluster=cluster)
         else:
             res = marginal_ate(df, f, outcome)
         rows.append(res.as_row())

@@ -21,6 +21,27 @@ from ..causal.backdoor import backdoor_adjust
 from ..causal.ei import ei_from_do_table
 from .ate import marginal_ate
 
+EI_LEVERAGE_COLUMNS = [
+    "factor",
+    "EI",
+    "EI_norm",
+    "determinism",
+    "degeneracy",
+    "n_states_x",
+    "n_states_y",
+    "ATE",
+    "ate_ci_low",
+    "ate_ci_high",
+    "do_p1_min",
+    "do_p1_max",
+    "EI_share",
+]
+
+
+def empty_ei_leverage_table() -> pd.DataFrame:
+    """Consistent schema when no factor has enough variation for EI."""
+    return pd.DataFrame(columns=EI_LEVERAGE_COLUMNS)
+
 
 def ei_leverage_table(
     df: pd.DataFrame,
@@ -28,26 +49,35 @@ def ei_leverage_table(
     outcome: str = "y",
     method: str = "gcomp",
     route: str = "backdoor",
+    scope_col: Optional[str] = None,
 ) -> pd.DataFrame:
     """Per-factor EI leverage table, sorted by normalized EI descending.
 
     route: "backdoor" (adjust for the factor's confounding set) or
            "experimental" (P(Y|do(X)) = P(Y|X), for randomized data).
+    scope_col: when set (e.g. "target_dim"), each factor f is estimated only on
+        the rows where `df[scope_col] == f`. Required for OFAT (Study 1), where
+        a factor's high level also appears as a fixed baseline inside *other*
+        dimensions' pairs (e.g. S1 is held high in the O4 pairs); estimating on
+        the whole frame would otherwise contaminate that factor's contrast.
     """
     factors = list(factors or all_ids())
     rows = []
     for f in factors:
-        if f not in df.columns or df[f].nunique() < 2:
+        sub = df
+        if scope_col and scope_col in df.columns:
+            sub = df[df[scope_col] == f]
+        if f not in sub.columns or sub[f].nunique() < 2:
             continue
         if route == "experimental":
-            do_p = backdoor_adjust(df, f, outcome, adjustment=[], method=method)
+            do_p = backdoor_adjust(sub, f, outcome, adjustment=[], method=method)
         else:
-            do_p = backdoor_adjust(df, f, outcome, method=method)
+            do_p = backdoor_adjust(sub, f, outcome, method=method)
         do_p = {k: v for k, v in do_p.items() if not np.isnan(v)}
         if len(do_p) < 2:
             continue
         ei = ei_from_do_table(do_p)
-        ate = marginal_ate(df, f, outcome)
+        ate = marginal_ate(sub, f, outcome)
         row = ei.as_row(name=f)
         row["ATE"] = ate.ate
         row["ate_ci_low"] = ate.ci_low
@@ -56,8 +86,25 @@ def ei_leverage_table(
         row["do_p1_max"] = float(max(do_p.values()))
         rows.append(row)
     out = pd.DataFrame(rows)
-    if not out.empty:
-        out = out.sort_values("EI_norm", ascending=False).reset_index(drop=True)
+    if out.empty:
+        return empty_ei_leverage_table()
+    out = _add_ei_share(out)
+    return out.sort_values("EI_norm", ascending=False).reset_index(drop=True)
+
+
+def _add_ei_share(tab: pd.DataFrame) -> pd.DataFrame:
+    """Add cross-factor relative normalization: EI_share = EI / sum(EI).
+
+    Sums to 1 over the table and answers "what fraction of total causal leverage
+    does each factor carry?"  Distinct from EI_norm (= EI / log2|Y|), which is
+  the per-factor fraction of the theoretical maximum for the outcome space.
+    """
+    out = tab.copy()
+    total = float(out["EI"].sum())
+    if total > 0:
+        out["EI_share"] = out["EI"] / total
+    else:
+        out["EI_share"] = 0.0
     return out
 
 
@@ -76,15 +123,22 @@ def cross_model_consistency(
     factors: Optional[Sequence[str]] = None,
     outcome: str = "y",
     model_col: str = "model",
+    route: str = "backdoor",
+    scope_col: Optional[str] = None,
 ) -> Dict[str, object]:
-    """Agreement of per-factor EI rankings across models (Kendall's W + variance)."""
+    """Agreement of per-factor EI rankings across models (Kendall's W + variance).
+
+    `route`/`scope_col` are forwarded to `ei_leverage_table`. For OFAT data
+    (Study 3) pass route="experimental", scope_col="target_dim" so each factor's
+    EI is estimated only on its own pairs, matching Study 1's corrected scope.
+    """
     from scipy import stats
 
     factors = list(factors or all_ids())
     rank_by_model = {}
     ei_by_model = {}
     for m, g in df.groupby(model_col):
-        tab = ei_leverage_table(g, factors, outcome)
+        tab = ei_leverage_table(g, factors, outcome, route=route, scope_col=scope_col)
         if tab.empty:
             continue
         tab = tab.set_index("factor")

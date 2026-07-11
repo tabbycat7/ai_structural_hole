@@ -20,6 +20,11 @@ python-dotenv>=1.0
 # (fractional factorial / orthogonal arrays implemented in-repo; pyDOE2 optional)
 pyDOE2>=1.3.0
 
+# Real RAG retrieval (Study 5): lexical BM25 + Chinese tokenization + dense bge
+rank_bm25>=0.2.2
+jieba>=0.42.1
+sentence-transformers>=2.2.2
+
 # Plotting
 matplotlib>=3.7
 seaborn>=0.13

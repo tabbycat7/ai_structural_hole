@@ -12,7 +12,7 @@ MODELS = ["mock/a", "mock/b"]
 def test_study1_runs():
     r = run_study1(MODELS, per_domain=1, mock=True)
     assert len(r.frame) > 0
-    assert {"factor", "EI_norm", "ATE"}.issubset(r.ei.columns)
+    assert {"factor", "EI_norm", "EI_share", "ATE"}.issubset(r.ei.columns)
     assert len(r.ei) == 8  # 8 dimensions
 
 

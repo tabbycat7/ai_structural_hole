@@ -14,7 +14,10 @@ decomposes as:
     determinism = log2|Y| - <H(Y|do(x))>_x     (higher = more reliable mapping)
     degeneracy  = log2|Y| - H(Pbar(Y))         (higher = causes collapse to same Y)
 
-Normalized effectiveness EI~ = EI / log2|Y| in [0,1] makes factors comparable.
+Normalized effectiveness EI~ = EI / log2|Y| in [0,1]: fraction of the theoretical
+maximum information for the outcome space (1.0 = perfect switch for binary Y).
+For binary Y, log2|Y| = 1 so EI_norm equals EI in bits.  For cross-factor
+relative shares (summing to 1), see EI_share in ei_leverage_table.
 All logs are base-2 (bits).
 """
 from __future__ import annotations

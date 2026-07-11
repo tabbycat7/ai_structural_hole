@@ -83,7 +83,12 @@ class CandidateSet:
         return len(self.ordered_ids)
 
     def target_position(self) -> int:
-        return self.ordered_ids.index(self.target_id)
+        # -1 when the target is absent from the candidate set (e.g. Study 6's
+        # real end-to-end RAG, where a non-retrieved target is not presented).
+        try:
+            return self.ordered_ids.index(self.target_id)
+        except ValueError:
+            return -1
 
 
 @dataclass
@@ -107,6 +112,10 @@ class Trial:
     rank: Dict[str, int] = field(default_factory=dict)
     raw_response: str = ""
     parse_ok: bool = True
+    # Non-empty when the API permanently rejected this request (e.g. a
+    # content-filter block). Such trials carry no valid decision and are
+    # excluded from analysis as missing data (not counted as y=0).
+    api_error: str = ""
 
     def target_y(self) -> int:
         return int(self.y.get(self.candidate_set.target_id, 0))
@@ -128,6 +137,7 @@ class Trial:
             "target_score": self.scores.get(cs.target_id, float("nan")),
             "target_rank": self.rank.get(cs.target_id, -1),
             "parse_ok": int(self.parse_ok),
+            "api_error": self.api_error,
         }
 
 
